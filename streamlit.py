@@ -77,19 +77,6 @@ st.markdown("""
 def cargar_modelo():
     """Carga el modelo desde Google Drive o archivo local"""
     try:
-        # Opción 1: Cargar desde Google Drive (reemplazar con tu ID)
-        # GDRIVE_FILE_ID = "1Zpr3zdVgtQaON23RP42ow_dII--lihLG"
-        # download_url = f"https://drive.google.com/uc?id={GDRIVE_FILE_ID}"
-        
-        # st.info("📥 Descargando modelo desde Google Drive...")
-        # response = requests.get(download_url)
-        # if response.status_code != 200:
-        #     st.error("❌ Error al descargar el modelo de Google Drive")
-        #     return None
-        # model_bytes = BytesIO(response.content)
-        # modelo_components = joblib.load(model_bytes)
-        
-        # Opción 2: Cargar archivo subido por el usuario
         st.info("📤 Por favor, sube el archivo del modelo entrenado (.joblib)")
         uploaded_file = st.file_uploader("Selecciona el archivo del modelo", type=['joblib'])
         
@@ -99,23 +86,29 @@ def cargar_modelo():
         
         modelo_components = joblib.load(uploaded_file)
         
+        # Verificar componentes requeridos
+        required_components = ['modelo', 'scaler', 'encoders', 'selected_features', 'target_encoder']
+        for component in required_components:
+            if component not in modelo_components:
+                st.error(f"❌ Componente faltante en el modelo: {component}")
+                return None
+        
         # Debug: Información del modelo
         with st.expander("🔍 Debug: Información del Modelo"):
             st.write("Características requeridas:", modelo_components['selected_features'])
             st.write("Columnas con encoders:", list(modelo_components['encoders'].keys()))
             st.write("Clases objetivo:", modelo_components['target_encoder'].classes_)
-            st.write("Información del Scaler:", {
-                'mean': dict(zip(modelo_components['selected_features'], 
-                               modelo_components['scaler'].mean_)),
-                'scale': dict(zip(modelo_components['selected_features'], 
-                                modelo_components['scaler'].scale_))
-            })
+            if 'accuracy' in modelo_components:
+                st.write("Accuracy del modelo:", f"{modelo_components['accuracy']:.4f}")
         
         st.success("✅ Modelo cargado exitosamente")
         return modelo_components
         
     except Exception as e:
         st.error(f"❌ Error al cargar el modelo: {str(e)}")
+        with st.expander("🔍 Debug: Error Detallado"):
+            st.write("Tipo de error:", type(e).__name__)
+            st.write("Mensaje:", str(e))
         return None
 
 def crear_campos_formulario():
@@ -237,7 +230,6 @@ def preparar_datos_para_modelo(datos, selected_features, encoders):
     
     # Crear un mapeo de las respuestas a valores numéricos
     feature_mapping = {
-        # Mapeos para variables categóricas - estos necesitarán ajuste según tu dataset real
         'social_preference': {
             'Actividades grupales': 2, 'Depende del día': 1, 'Actividades individuales': 0
         },
@@ -292,23 +284,21 @@ def preparar_datos_para_modelo(datos, selected_features, encoders):
     available_features = [col for col in selected_features if col in df_base.columns]
     
     if not available_features:
-        # Si no coincide ninguna característica, usar todas las disponibles
         available_features = df_base.columns.tolist()
         st.warning("⚠️ Las características del formulario no coinciden exactamente con el modelo. Usando mapeo genérico.")
     
     # Si faltan características, agregar valores por defecto
     for feature in selected_features:
         if feature not in df_base.columns:
-            df_base[feature] = 0  # Valor por defecto
+            df_base[feature] = 0
     
     # Debug: Mostrar información de preparación
     with st.expander("🔍 Debug: Preparación de Datos"):
         st.write("1. Características requeridas por el modelo:", selected_features)
         st.write("2. Características disponibles:", available_features)
         st.write("3. DataFrame preparado:")
-        st.dataframe(df_base)
+        st.dataframe(df_base[selected_features])
         
-        # Verificar características faltantes
         missing_features = [col for col in selected_features if col not in df_base.columns]
         if missing_features:
             st.warning(f"⚠️ Características faltantes (usando valores por defecto): {missing_features}")
@@ -318,10 +308,8 @@ def preparar_datos_para_modelo(datos, selected_features, encoders):
 def procesar_prediccion(df_preparado, modelo_components):
     """Procesa la predicción con el modelo"""
     try:
-        # Extraer componentes del modelo
         modelo = modelo_components['modelo']
         scaler = modelo_components['scaler']
-        encoders = modelo_components['encoders']
         target_encoder = modelo_components['target_encoder']
         
         # Aplicar encoders a variables categóricas si es necesario
@@ -351,11 +339,13 @@ def procesar_prediccion(df_preparado, modelo_components):
         
         # Obtener probabilidades si está disponible
         probabilidades = None
-        if hasattr(modelo, 'decision_function'):
-            decision_scores = modelo.decision_function(datos_scaled)[0]
-            # Convertir scores de decisión a probabilidades aproximadas
-            prob_extrovert = 1 / (1 + np.exp(-decision_scores))
-            probabilidades = [1 - prob_extrovert, prob_extrovert]
+        try:
+            if hasattr(modelo, 'decision_function'):
+                decision_scores = modelo.decision_function(datos_scaled)[0]
+                prob_extrovert = 1 / (1 + np.exp(-decision_scores))
+                probabilidades = [1 - prob_extrovert, prob_extrovert]
+        except:
+            pass
         
         # Decodificar la predicción
         personalidad = target_encoder.inverse_transform([prediccion])[0]
@@ -367,8 +357,6 @@ def procesar_prediccion(df_preparado, modelo_components):
         with st.expander("🔍 Debug: Error Detallado"):
             st.write("Tipo de error:", type(e).__name__)
             st.write("Mensaje:", str(e))
-            import traceback
-            st.code(traceback.format_exc())
         return None, None
 
 def mostrar_resultado(personalidad, datos, probabilidades=None):
@@ -435,6 +423,11 @@ def mostrar_resultado(personalidad, datos, probabilidades=None):
             st.metric(
                 label="Confianza",
                 value=f"{confianza:.1%}"
+            )
+        else:
+            st.metric(
+                label="Confianza",
+                value="N/A"
             )
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -620,8 +613,6 @@ def main():
             with st.expander("🔍 Debug: Error Detallado"):
                 st.write("Tipo de error:", type(e).__name__)
                 st.write("Mensaje:", str(e))
-                import traceback
-                st.code(traceback.format_exc())
 
     # Información adicional
     with st.expander("ℹ️ Información sobre Introversión y Extroversión"):
