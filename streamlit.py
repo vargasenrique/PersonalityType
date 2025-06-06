@@ -75,35 +75,26 @@ st.markdown("""
 
 @st.cache_resource
 def cargar_modelo():
-    """Carga el modelo desde Google Drive o archivo local"""
+    """Carga el modelo desde Google Drive"""
     try:
-        # Opción 1: Cargar desde Google Drive (reemplazar con tu ID)
-        # GDRIVE_FILE_ID = "1Zpr3zdVgtQaON23RP42ow_dII--lihLG"
-        # download_url = f"https://drive.google.com/uc?id={GDRIVE_FILE_ID}"
+        # URL de Google Drive (reemplazar con tu ID)
+        GDRIVE_FILE_ID = "d/1zjN_rOHz9Rs7wXuC15ElSHkL5IPrurG2"
+        download_url = f"https://drive.google.com/uc?id={GDRIVE_FILE_ID}"
         
-        # st.info("📥 Descargando modelo desde Google Drive...")
-        # response = requests.get(download_url)
-        # if response.status_code != 200:
-        #     st.error("❌ Error al descargar el modelo de Google Drive")
-        #     return None
-        # model_bytes = BytesIO(response.content)
-        # modelo_components = joblib.load(model_bytes)
+        st.info("📥 Descargando modelo...")
         
-        # Opción 2: Cargar archivo subido por el usuario
-        st.info("📤 Por favor, sube el archivo del modelo entrenado (.joblib)")
-        uploaded_file = st.file_uploader("Selecciona el archivo del modelo", type=['joblib'])
-        
-        if uploaded_file is None:
-            st.warning("⚠️ Necesitas subir un archivo de modelo para continuar")
+        response = requests.get(download_url)
+        if response.status_code != 200:
+            st.error("❌ Error al descargar el modelo de Google Drive")
             return None
-        
-        modelo_components = joblib.load(uploaded_file)
+            
+        model_bytes = BytesIO(response.content)
+        modelo_components = joblib.load(model_bytes)
         
         # Debug: Información del modelo
         with st.expander("🔍 Debug: Información del Modelo"):
             st.write("Características requeridas:", modelo_components['selected_features'])
             st.write("Columnas con encoders:", list(modelo_components['encoders'].keys()))
-            st.write("Clases objetivo:", modelo_components['target_encoder'].classes_)
             st.write("Información del Scaler:", {
                 'mean': dict(zip(modelo_components['selected_features'], 
                                modelo_components['scaler'].mean_)),
