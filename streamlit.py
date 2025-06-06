@@ -78,7 +78,7 @@ def cargar_modelo():
     """Carga el modelo desde Google Drive"""
     try:
         # URL de Google Drive (reemplazar con tu ID)
-        GDRIVE_FILE_ID = "1zjN_rOHz9Rs7wXuC15ElSHkL5IPrurG2"
+        GDRIVE_FILE_ID = "1hKuY9yTW-WTSMDnPj7gjGOUr022QYGLt"
         download_url = f"https://drive.google.com/uc?id={GDRIVE_FILE_ID}"
         
         st.info("📥 Descargando modelo...")
