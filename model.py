@@ -285,9 +285,17 @@ class PersonalityModelTrainer:
         """Guarda el modelo completo con toda la información necesaria"""
         print("💾 GUARDANDO MODELO COMPLETO")
         print("=" * 50)
-        
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
+
+        # Determinar tipo de cada feature seleccionada
+        feature_types = {}
+        for col in self.selected_features:
+            if col in self.encoders:
+                feature_types[col] = 'categorical'
+            else:
+                feature_types[col] = 'numerical'
+
         # Componentes del modelo
         modelo_components = {
             'modelo': self.modelo,
@@ -304,12 +312,12 @@ class PersonalityModelTrainer:
                 'training_date': datetime.now().isoformat()
             }
         }
-        
+
         # Guardar modelo principal
         filename = f'modelo_personalidad_{timestamp}.joblib'
         joblib.dump(modelo_components, filename)
         print(f"✅ Modelo guardado: {filename}")
-        
+
         # Información de debug
         debug_info = {
             'model_metadata': {
@@ -320,25 +328,26 @@ class PersonalityModelTrainer:
             },
             'features': {
                 'selected_features': self.selected_features,
-                'features_count': len(self.selected_features)
+                'features_count': len(self.selected_features),
+                'feature_types': feature_types
             },
             'encoders': {
                 'categorical_columns': list(self.encoders.keys()),
-                'encoder_classes': {col: encoder.classes_.tolist() 
+                'encoder_classes': {col: encoder.classes_.tolist()
                                  for col, encoder in self.encoders.items()}
             },
             'target_encoder': {
                 'classes': self.target_encoder.classes_.tolist(),
-                'class_mapping': dict(zip(self.target_encoder.classes_, 
+                'class_mapping': dict(zip(self.target_encoder.classes_,
                                         range(len(self.target_encoder.classes_))))
             }
         }
-        
+
         debug_filename = f'modelo_debug_{timestamp}.json'
         with open(debug_filename, 'w', encoding='utf-8') as f:
             json.dump(debug_info, f, indent=4, ensure_ascii=False)
         print(f"✅ Debug info guardada: {debug_filename}")
-        
+
         # README
         readme_content = f"""# Modelo de Personalidad - {timestamp}
 
@@ -363,12 +372,12 @@ class PersonalityModelTrainer:
 ## Clases de Salida
 {chr(10).join([f"- {cls}" for cls in self.target_encoder.classes_])}
 """
-        
+
         readme_filename = f'README_{timestamp}.md'
         with open(readme_filename, 'w', encoding='utf-8') as f:
             f.write(readme_content)
         print(f"✅ README guardado: {readme_filename}")
-        
+
         return filename, debug_filename, readme_filename
     
     def validar_modelo(self, filename):
